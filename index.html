@@ -258,16 +258,16 @@
                 
                 const courtGeometry = new THREE.PlaneGeometry(50, 30);
                 const courtMaterial = new THREE.MeshLambertMaterial({ 
-                    map: courtTexture,
-                    transparent: true 
+                    map: courtTexture
                 });
                 this.court = new THREE.Mesh(courtGeometry, courtMaterial);
                 this.court.rotation.x = -Math.PI / 2;
                 this.court.receiveShadow = true;
                 this.scene.add(this.court);
                 
-                // Basketball hoop with pole
-                await this.createHoop();
+                // Basketball hoops with poles - both ends of court
+                await this.createHoop(0, -15); // One end
+                await this.createHoop(0, 15);  // Other end
                 
                 // Create initial ball
                 await this.createBall();
@@ -282,14 +282,14 @@
                 this.createAtmosphere();
             }
 
-            async createHoop() {
+            async createHoop(x = 0, z = -15) {
                 const hoopGroup = new THREE.Group();
                 
                 // Support pole
                 const poleGeometry = new THREE.CylinderGeometry(0.2, 0.2, 10);
                 const poleMaterial = new THREE.MeshLambertMaterial({ color: 0x555555 });
                 const pole = new THREE.Mesh(poleGeometry, poleMaterial);
-                pole.position.set(0, 5, -15);
+                pole.position.set(x, 5, z);
                 pole.castShadow = true;
                 hoopGroup.add(pole);
                 
@@ -297,14 +297,14 @@
                 const baseGeometry = new THREE.CylinderGeometry(1, 1, 0.5);
                 const baseMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
                 const base = new THREE.Mesh(baseGeometry, baseMaterial);
-                base.position.set(0, 0.25, -15);
+                base.position.set(x, 0.25, z);
                 hoopGroup.add(base);
                 
                 // Support arm
                 const armGeometry = new THREE.BoxGeometry(0.3, 0.3, 4);
                 const armMaterial = new THREE.MeshLambertMaterial({ color: 0x555555 });
                 const arm = new THREE.Mesh(armGeometry, armMaterial);
-                arm.position.set(0, 8, -13);
+                arm.position.set(x, 8, z > 0 ? z - 2 : z + 2);
                 hoopGroup.add(arm);
                 
                 // Backboard with detailed texture
@@ -318,7 +318,8 @@
                     shininess: 100
                 });
                 const backboard = new THREE.Mesh(backboardGeometry, backboardMaterial);
-                backboard.position.set(0, 8, -12);
+                backboard.position.set(x, 8, z > 0 ? z - 1 : z + 1);
+                if (z > 0) backboard.rotation.y = Math.PI; // Flip for other end
                 backboard.castShadow = true;
                 hoopGroup.add(backboard);
                 
@@ -329,7 +330,7 @@
                     shininess: 80
                 });
                 const rim = new THREE.Mesh(rimGeometry, rimMaterial);
-                rim.position.set(0, 6, -11);
+                rim.position.set(x, 6, z > 0 ? z + 1 : z - 1);
                 rim.rotation.x = Math.PI / 2;
                 rim.castShadow = true;
                 hoopGroup.add(rim);
@@ -346,27 +347,41 @@
                     side: THREE.DoubleSide
                 });
                 const net = new THREE.Mesh(netGeometry, netMaterial);
-                net.position.set(0, 4.5, -11);
+                net.position.set(x, 4.5, z > 0 ? z + 1 : z - 1);
                 hoopGroup.add(net);
                 
-                this.hoop = hoopGroup;
+                if (!this.hoop) this.hoop = hoopGroup; // Keep reference to first hoop
                 this.scene.add(hoopGroup);
             }
 
             async createDetailedStadium() {
-                // Main stadium structure
+                // Main stadium structure with walls
                 for (let i = 0; i < 8; i++) {
                     const angle = (i * Math.PI * 2) / 8;
                     const radius = 45;
+                    
+                    // Stadium walls
+                    const wallGeometry = new THREE.BoxGeometry(12, 20, 2);
+                    const wallMaterial = new THREE.MeshLambertMaterial({ color: 0x666666 });
+                    const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+                    wall.position.set(
+                        Math.cos(angle) * radius,
+                        10,
+                        Math.sin(angle) * radius
+                    );
+                    wall.lookAt(0, 10, 0);
+                    wall.castShadow = true;
+                    wall.receiveShadow = true;
+                    this.scene.add(wall);
                     
                     // Lower tier stands
                     const lowerStandGeometry = new THREE.BoxGeometry(12, 6, 4);
                     const lowerStandMaterial = new THREE.MeshLambertMaterial({ color: 0x444444 });
                     const lowerStand = new THREE.Mesh(lowerStandGeometry, lowerStandMaterial);
                     lowerStand.position.set(
-                        Math.cos(angle) * radius,
+                        Math.cos(angle) * (radius - 3),
                         3,
-                        Math.sin(angle) * radius
+                        Math.sin(angle) * (radius - 3)
                     );
                     lowerStand.lookAt(0, 3, 0);
                     lowerStand.castShadow = true;
@@ -377,9 +392,9 @@
                     const upperStandMaterial = new THREE.MeshLambertMaterial({ color: 0x555555 });
                     const upperStand = new THREE.Mesh(upperStandGeometry, upperStandMaterial);
                     upperStand.position.set(
-                        Math.cos(angle) * (radius + 8),
+                        Math.cos(angle) * (radius - 6),
                         8,
-                        Math.sin(angle) * (radius + 8)
+                        Math.sin(angle) * (radius - 6)
                     );
                     upperStand.lookAt(0, 8, 0);
                     upperStand.castShadow = true;
@@ -396,43 +411,12 @@
                     });
                     const crowd = new THREE.Mesh(crowdGeometry, crowdMaterial);
                     crowd.position.set(
-                        Math.cos(angle) * (radius - 2),
+                        Math.cos(angle) * (radius - 5),
                         4,
-                        Math.sin(angle) * (radius - 2)
+                        Math.sin(angle) * (radius - 5)
                     );
                     crowd.lookAt(0, 4, 0);
                     this.scene.add(crowd);
-                }
-                
-                // Stadium roof structure
-                const roofGeometry = new THREE.CylinderGeometry(60, 55, 3, 16, 1, true);
-                const roofMaterial = new THREE.MeshLambertMaterial({ 
-                    color: 0x333333,
-                    transparent: true,
-                    opacity: 0.8,
-                    side: THREE.DoubleSide
-                });
-                const roof = new THREE.Mesh(roofGeometry, roofMaterial);
-                roof.position.y = 25;
-                this.scene.add(roof);
-                
-                // Stadium banners
-                for (let i = 0; i < 4; i++) {
-                    const bannerTexture = await this.getOrGenerateAsset(`banner_${i}.png`,
-                        'Basketball team banner with logo, championship years, team colors, hanging banner style');
-                    
-                    const bannerGeometry = new THREE.PlaneGeometry(3, 6);
-                    const bannerMaterial = new THREE.MeshLambertMaterial({ 
-                        map: bannerTexture,
-                        transparent: true 
-                    });
-                    const banner = new THREE.Mesh(bannerGeometry, bannerMaterial);
-                    banner.position.set(
-                        Math.cos(i * Math.PI / 2) * 35,
-                        15,
-                        Math.sin(i * Math.PI / 2) * 35
-                    );
-                    this.scene.add(banner);
                 }
             }
 
