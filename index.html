@@ -252,9 +252,9 @@
             }
             
             async setupCourt() {
-                // Court floor
+                // Court floor with detailed markings
                 const courtTexture = await this.getOrGenerateAsset('court_floor.png', 
-                    'Basketball court floor with orange and black lines, wooden texture, top-down view');
+                    'Professional basketball court floor with detailed orange and black lines, three-point arc, free throw line, center circle, team logos, wooden parquet texture, top-down view');
                 
                 const courtGeometry = new THREE.PlaneGeometry(50, 30);
                 const courtMaterial = new THREE.MeshLambertMaterial({ 
@@ -266,46 +266,83 @@
                 this.court.receiveShadow = true;
                 this.scene.add(this.court);
                 
-                // Basketball hoop
+                // Basketball hoop with pole
                 await this.createHoop();
                 
                 // Create initial ball
                 await this.createBall();
                 
-                // Stadium environment
-                await this.createStadium();
+                // Enhanced stadium environment
+                await this.createDetailedStadium();
+                
+                // Add scoreboards and jumbotrons
+                await this.createScoreboards();
+                
+                // Add atmospheric elements
+                this.createAtmosphere();
             }
-            
+
             async createHoop() {
                 const hoopGroup = new THREE.Group();
                 
-                // Backboard
+                // Support pole
+                const poleGeometry = new THREE.CylinderGeometry(0.2, 0.2, 10);
+                const poleMaterial = new THREE.MeshLambertMaterial({ color: 0x555555 });
+                const pole = new THREE.Mesh(poleGeometry, poleMaterial);
+                pole.position.set(0, 5, -15);
+                pole.castShadow = true;
+                hoopGroup.add(pole);
+                
+                // Pole base
+                const baseGeometry = new THREE.CylinderGeometry(1, 1, 0.5);
+                const baseMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
+                const base = new THREE.Mesh(baseGeometry, baseMaterial);
+                base.position.set(0, 0.25, -15);
+                hoopGroup.add(base);
+                
+                // Support arm
+                const armGeometry = new THREE.BoxGeometry(0.3, 0.3, 4);
+                const armMaterial = new THREE.MeshLambertMaterial({ color: 0x555555 });
+                const arm = new THREE.Mesh(armGeometry, armMaterial);
+                arm.position.set(0, 8, -13);
+                hoopGroup.add(arm);
+                
+                // Backboard with detailed texture
                 const backboardTexture = await this.getOrGenerateAsset('backboard.png',
-                    'White basketball backboard with orange rim and black square outline');
+                    'Professional basketball backboard, white with orange rim, black target square, realistic glass reflection, brand logos');
                 
                 const backboardGeometry = new THREE.PlaneGeometry(6, 4);
-                const backboardMaterial = new THREE.MeshLambertMaterial({ 
+                const backboardMaterial = new THREE.MeshPhongMaterial({ 
                     map: backboardTexture,
-                    transparent: true 
+                    transparent: true,
+                    shininess: 100
                 });
                 const backboard = new THREE.Mesh(backboardGeometry, backboardMaterial);
                 backboard.position.set(0, 8, -12);
+                backboard.castShadow = true;
                 hoopGroup.add(backboard);
                 
-                // Rim
+                // Rim with better material
                 const rimGeometry = new THREE.TorusGeometry(0.9, 0.05, 8, 16);
-                const rimMaterial = new THREE.MeshLambertMaterial({ color: 0xff4500 });
+                const rimMaterial = new THREE.MeshPhongMaterial({ 
+                    color: 0xff4500,
+                    shininess: 80
+                });
                 const rim = new THREE.Mesh(rimGeometry, rimMaterial);
                 rim.position.set(0, 6, -11);
                 rim.rotation.x = Math.PI / 2;
+                rim.castShadow = true;
                 hoopGroup.add(rim);
                 
-                // Net
+                // Detailed net with chain texture
+                const netTexture = await this.getOrGenerateAsset('basketball_net.png',
+                    'White basketball net with chain-link pattern, hanging from rim, transparent background');
+                
                 const netGeometry = new THREE.CylinderGeometry(0.8, 1.1, 2, 8, 1, true);
                 const netMaterial = new THREE.MeshLambertMaterial({ 
-                    color: 0xffffff,
+                    map: netTexture,
                     transparent: true,
-                    opacity: 0.7,
+                    opacity: 0.8,
                     side: THREE.DoubleSide
                 });
                 const net = new THREE.Mesh(netGeometry, netMaterial);
@@ -315,7 +352,191 @@
                 this.hoop = hoopGroup;
                 this.scene.add(hoopGroup);
             }
+
+            async createDetailedStadium() {
+                // Main stadium structure
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i * Math.PI * 2) / 8;
+                    const radius = 45;
+                    
+                    // Lower tier stands
+                    const lowerStandGeometry = new THREE.BoxGeometry(12, 6, 4);
+                    const lowerStandMaterial = new THREE.MeshLambertMaterial({ color: 0x444444 });
+                    const lowerStand = new THREE.Mesh(lowerStandGeometry, lowerStandMaterial);
+                    lowerStand.position.set(
+                        Math.cos(angle) * radius,
+                        3,
+                        Math.sin(angle) * radius
+                    );
+                    lowerStand.lookAt(0, 3, 0);
+                    lowerStand.castShadow = true;
+                    this.scene.add(lowerStand);
+                    
+                    // Upper tier stands
+                    const upperStandGeometry = new THREE.BoxGeometry(10, 8, 3);
+                    const upperStandMaterial = new THREE.MeshLambertMaterial({ color: 0x555555 });
+                    const upperStand = new THREE.Mesh(upperStandGeometry, upperStandMaterial);
+                    upperStand.position.set(
+                        Math.cos(angle) * (radius + 8),
+                        8,
+                        Math.sin(angle) * (radius + 8)
+                    );
+                    upperStand.lookAt(0, 8, 0);
+                    upperStand.castShadow = true;
+                    this.scene.add(upperStand);
+                    
+                    // Crowd texture for stands
+                    const crowdTexture = await this.getOrGenerateAsset('crowd.png',
+                        'Basketball arena crowd, diverse people cheering, colorful team jerseys, excited faces, stadium seating');
+                    
+                    const crowdGeometry = new THREE.PlaneGeometry(12, 4);
+                    const crowdMaterial = new THREE.MeshLambertMaterial({ 
+                        map: crowdTexture,
+                        transparent: true 
+                    });
+                    const crowd = new THREE.Mesh(crowdGeometry, crowdMaterial);
+                    crowd.position.set(
+                        Math.cos(angle) * (radius - 2),
+                        4,
+                        Math.sin(angle) * (radius - 2)
+                    );
+                    crowd.lookAt(0, 4, 0);
+                    this.scene.add(crowd);
+                }
+                
+                // Stadium roof structure
+                const roofGeometry = new THREE.CylinderGeometry(60, 55, 3, 16, 1, true);
+                const roofMaterial = new THREE.MeshLambertMaterial({ 
+                    color: 0x333333,
+                    transparent: true,
+                    opacity: 0.8,
+                    side: THREE.DoubleSide
+                });
+                const roof = new THREE.Mesh(roofGeometry, roofMaterial);
+                roof.position.y = 25;
+                this.scene.add(roof);
+                
+                // Stadium banners
+                for (let i = 0; i < 4; i++) {
+                    const bannerTexture = await this.getOrGenerateAsset(`banner_${i}.png`,
+                        'Basketball team banner with logo, championship years, team colors, hanging banner style');
+                    
+                    const bannerGeometry = new THREE.PlaneGeometry(3, 6);
+                    const bannerMaterial = new THREE.MeshLambertMaterial({ 
+                        map: bannerTexture,
+                        transparent: true 
+                    });
+                    const banner = new THREE.Mesh(bannerGeometry, bannerMaterial);
+                    banner.position.set(
+                        Math.cos(i * Math.PI / 2) * 35,
+                        15,
+                        Math.sin(i * Math.PI / 2) * 35
+                    );
+                    this.scene.add(banner);
+                }
+            }
+
+            async createScoreboards() {
+                // Main jumbotron
+                const jumbotronTexture = await this.getOrGenerateAsset('jumbotron.png',
+                    'Basketball arena jumbotron screen showing game stats, team logos, bright LED display, "DUNK SIMULATOR" text');
+                
+                const jumbotronGeometry = new THREE.PlaneGeometry(8, 4);
+                const jumbotronMaterial = new THREE.MeshPhongMaterial({ 
+                    map: jumbotronTexture,
+                    emissive: 0x222222,
+                    transparent: true 
+                });
+                const jumbotron = new THREE.Mesh(jumbotronGeometry, jumbotronMaterial);
+                jumbotron.position.set(0, 20, 0);
+                jumbotron.rotation.x = -Math.PI / 6;
+                this.scene.add(jumbotron);
+                
+                // Side scoreboards
+                for (let i = 0; i < 2; i++) {
+                    const scoreboardTexture = await this.getOrGenerateAsset(`scoreboard_${i}.png`,
+                        'Digital basketball scoreboard with team names, score numbers, game clock, LED style display');
+                    
+                    const scoreboardGeometry = new THREE.PlaneGeometry(4, 2);
+                    const scoreboardMaterial = new THREE.MeshPhongMaterial({ 
+                        map: scoreboardTexture,
+                        emissive: 0x111111,
+                        transparent: true 
+                    });
+                    const scoreboard = new THREE.Mesh(scoreboardGeometry, scoreboardMaterial);
+                    scoreboard.position.set(i === 0 ? -25 : 25, 12, 0);
+                    scoreboard.rotation.y = i === 0 ? Math.PI / 2 : -Math.PI / 2;
+                    this.scene.add(scoreboard);
+                }
+            }
             
+            createAtmosphere() {
+                // Spotlights with cone effects
+                for (let i = 0; i < 6; i++) {
+                    const spotlight = new THREE.SpotLight(0xffffff, 0.8, 50, Math.PI / 6, 0.3);
+                    spotlight.position.set(
+                        Math.cos(i * Math.PI / 3) * 30,
+                        22,
+                        Math.sin(i * Math.PI / 3) * 30
+                    );
+                    spotlight.target.position.set(0, 0, 0);
+                    spotlight.castShadow = true;
+                    this.scene.add(spotlight);
+                    this.scene.add(spotlight.target);
+                    
+                    // Visible light cone
+                    const coneGeometry = new THREE.ConeGeometry(8, 15, 8, 1, true);
+                    const coneMaterial = new THREE.MeshBasicMaterial({ 
+                        color: 0xffffff,
+                        transparent: true,
+                        opacity: 0.1,
+                        side: THREE.DoubleSide
+                    });
+                    const cone = new THREE.Mesh(coneGeometry, coneMaterial);
+                    cone.position.copy(spotlight.position);
+                    cone.position.y -= 7;
+                    cone.rotation.x = Math.PI;
+                    this.scene.add(cone);
+                }
+                
+                // Floating particles for atmosphere
+                this.createFloatingParticles();
+            }
+            
+            createFloatingParticles() {
+                const particleCount = 100;
+                const particleGeometry = new THREE.BufferGeometry();
+                const positions = new Float32Array(particleCount * 3);
+                
+                for (let i = 0; i < particleCount * 3; i += 3) {
+                    positions[i] = (Math.random() - 0.5) * 100;
+                    positions[i + 1] = Math.random() * 30;
+                    positions[i + 2] = (Math.random() - 0.5) * 100;
+                }
+                
+                particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                
+                const particleMaterial = new THREE.PointsMaterial({
+                    color: 0xffffff,
+                    size: 0.1,
+                    transparent: true,
+                    opacity: 0.6
+                });
+                
+                const particles = new THREE.Points(particleGeometry, particleMaterial);
+                this.scene.add(particles);
+                
+                // Animate particles
+                this.animateParticles = () => {
+                    const positions = particles.geometry.attributes.position.array;
+                    for (let i = 1; i < positions.length; i += 3) {
+                        positions[i] += 0.01;
+                        if (positions[i] > 30) positions[i] = 0;
+                    }
+                    particles.geometry.attributes.position.needsUpdate = true;
+                };
+            }
+
             async createBall() {
                 const ballTexture = await this.getOrGenerateAsset('basketball.png',
                     'Orange basketball with black curved lines, realistic texture');
@@ -330,22 +551,7 @@
                 this.ball.castShadow = true;
                 this.scene.add(this.ball);
             }
-            
-            async createStadium() {
-                // Audience stands
-                for (let i = 0; i < 6; i++) {
-                    const standGeometry = new THREE.BoxGeometry(10, 8, 3);
-                    const standMaterial = new THREE.MeshLambertMaterial({ color: 0x666666 });
-                    const stand = new THREE.Mesh(standGeometry, standMaterial);
-                    stand.position.set(
-                        Math.cos(i * Math.PI / 3) * 40,
-                        4,
-                        Math.sin(i * Math.PI / 3) * 40
-                    );
-                    this.scene.add(stand);
-                }
-            }
-            
+
             async getOrGenerateAsset(filename, prompt) {
                 if (this.assetCache[filename]) {
                     // Load from cache
@@ -506,6 +712,11 @@
                 
                 // Check for dunk
                 this.checkDunk();
+                
+                // Animate floating particles
+                if (this.animateParticles) {
+                    this.animateParticles();
+                }
             }
             
             checkDunk() {
@@ -593,4 +804,3 @@
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
-
