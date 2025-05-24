@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultimate Dunking Simulator</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            font-family: 'Arial', sans-serif;
+            color: white;
+        }
+        
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+        
+        #characterSelector {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            z-index: 200;
+            max-width: 500px;
+        }
+        
+        #characterInput {
+            width: 100%;
+            padding: 15px;
+            font-size: 18px;
+            border: none;
+            border-radius: 8px;
+            margin: 10px 0;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+        }
+        
+        button {
+            background: #ff6b35;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover {
+            background: #ff5722;
+            transform: translateY(-2px);
+        }
+        
+        #loadingScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 300;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #333;
+            border-top: 5px solid #ff6b35;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .control-hint {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+        #transformButton {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 100;
+            font-size: 18px;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="ui">
+            <h2>Ultimate Dunking Simulator</h2>
+            <div>Power: <span id="power">0</span>%</div>
+            <div>Height: <span id="height">0</span>ft</div>
+            <div>Character: <span id="currentCharacter">None</span></div>
+        </div>
+        
+        <div id="characterSelector">
+            <h2>Choose Your Character</h2>
+            <p>You can be anything! What do you want to play as?</p>
+            <input type="text" id="characterInput" placeholder="e.g., dragon, robot, dinosaur, superhero...">
+            <br>
+            <button onclick="generateCharacter()">Generate Character</button>
+            <button onclick="useRandomCharacter()">Surprise Me!</button>
+        </div>
+        
+        <div id="loadingScreen" style="display: none;">
+            <div class="loading-spinner"></div>
+            <h3 id="loadingText">Generating your character...</h3>
+        </div>
+        
+        <div id="controls">
+            <div class="control-hint">WASD - Move</div>
+            <div class="control-hint">Space - Jump/Dunk</div>
+            <div class="control-hint">Mouse - Look Around</div>
+            <div class="control-hint">Hold Space - Charge Power</div>
+        </div>
+        
+        <button id="transformButton" onclick="transformToBall()">Become the Ball!</button>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+        
+        class DunkingSimulator {
+            constructor() {
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.controls = null;
+                
+                this.player = null;
+                this.ball = null;
+                this.court = null;
+                this.hoop = null;
+                
+                this.isPlayerBall = false;
+                this.jumpPower = 0;
+                this.isCharging = false;
+                this.playerVelocity = new THREE.Vector3();
+                this.gravity = -0.02;
+                this.groundLevel = 0;
+                
+                this.keys = {};
+                this.currentCharacterName = "";
+                this.assetCache = this.loadAssetCache();
+                
+                this.init();
+            }
+            
+            loadAssetCache() {
+                const cached = localStorage.getItem('dunkingSimAssets');
+                return cached ? JSON.parse(cached) : {};
+            }
+            
+            saveAssetCache() {
+                localStorage.setItem('dunkingSimAssets', JSON.stringify(this.assetCache));
+            }
+            
+            async init() {
+                this.setupRenderer();
+                this.setupLighting();
+                await this.setupCourt();
+                this.setupControls();
+                this.setupEventListeners();
+                this.animate();
+            }
+            
+            setupRenderer() {
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setClearColor(0x87CEEB);
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                document.getElementById('gameContainer').appendChild(this.renderer.domElement);
+            }
+            
+            setupLighting() {
+                // Ambient light
+                const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+                this.scene.add(ambientLight);
+                
+                // Directional light (sun)
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(50, 100, 50);
+                directionalLight.castShadow = true;
+                directionalLight.shadow.mapSize.width = 2048;
+                directionalLight.shadow.mapSize.height = 2048;
+                directionalLight.shadow.camera.near = 0.5;
+                directionalLight.shadow.camera.far = 500;
+                this.scene.add(directionalLight);
+                
+                // Stadium lights
+                for (let i = 0; i < 4; i++) {
+                    const light = new THREE.PointLight(0xffffff, 0.6, 100);
+                    light.position.set(
+                        Math.cos(i * Math.PI / 2) * 30,
+                        25,
+                        Math.sin(i * Math.PI / 2) * 30
+                    );
+                    this.scene.add(light);
+                }
+            }
+            
+            async setupCourt() {
+                // Court floor
+                const courtTexture = await this.getOrGenerateAsset('court_floor.png', 
+                    'Basketball court floor with orange and black lines, wooden texture, top-down view');
+                
+                const courtGeometry = new THREE.PlaneGeometry(50, 30);
+                const courtMaterial = new THREE.MeshLambertMaterial({ 
+                    map: courtTexture,
+                    transparent: true 
+                });
+                this.court = new THREE.Mesh(courtGeometry, courtMaterial);
+                this.court.rotation.x = -Math.PI / 2;
+                this.court.receiveShadow = true;
+                this.scene.add(this.court);
+                
+                // Basketball hoop
+                await this.createHoop();
+                
+                // Create initial ball
+                await this.createBall();
+                
+                // Stadium environment
+                await this.createStadium();
+            }
+            
+            async createHoop() {
+                const hoopGroup = new THREE.Group();
+                
+                // Backboard
+                const backboardTexture = await this.getOrGenerateAsset('backboard.png',
+                    'White basketball backboard with orange rim and black square outline');
+                
+                const backboardGeometry = new THREE.PlaneGeometry(6, 4);
+                const backboardMaterial = new THREE.MeshLambertMaterial({ 
+                    map: backboardTexture,
+                    transparent: true 
+                });
+                const backboard = new THREE.Mesh(backboardGeometry, backboardMaterial);
+                backboard.position.set(0, 8, -12);
+                hoopGroup.add(backboard);
+                
+                // Rim
+                const rimGeometry = new THREE.TorusGeometry(0.9, 0.05, 8, 16);
+                const rimMaterial = new THREE.MeshLambertMaterial({ color: 0xff4500 });
+                const rim = new THREE.Mesh(rimGeometry, rimMaterial);
+                rim.position.set(0, 6, -11);
+                rim.rotation.x = Math.PI / 2;
+                hoopGroup.add(rim);
+                
+                // Net
+                const netGeometry = new THREE.CylinderGeometry(0.8, 1.1, 2, 8, 1, true);
+                const netMaterial = new THREE.MeshLambertMaterial({ 
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 0.7,
+                    side: THREE.DoubleSide
+                });
+                const net = new THREE.Mesh(netGeometry, netMaterial);
+                net.position.set(0, 4.5, -11);
+                hoopGroup.add(net);
+                
+                this.hoop = hoopGroup;
+                this.scene.add(hoopGroup);
+            }
+            
+            async createBall() {
+                const ballTexture = await this.getOrGenerateAsset('basketball.png',
+                    'Orange basketball with black curved lines, realistic texture');
+                
+                const ballGeometry = new THREE.SphereGeometry(0.6, 32, 32);
+                const ballMaterial = new THREE.MeshLambertMaterial({ 
+                    map: ballTexture,
+                    transparent: true 
+                });
+                this.ball = new THREE.Mesh(ballGeometry, ballMaterial);
+                this.ball.position.set(5, 1, 0);
+                this.ball.castShadow = true;
+                this.scene.add(this.ball);
+            }
+            
+            async createStadium() {
+                // Audience stands
+                for (let i = 0; i < 6; i++) {
+                    const standGeometry = new THREE.BoxGeometry(10, 8, 3);
+                    const standMaterial = new THREE.MeshLambertMaterial({ color: 0x666666 });
+                    const stand = new THREE.Mesh(standGeometry, standMaterial);
+                    stand.position.set(
+                        Math.cos(i * Math.PI / 3) * 40,
+                        4,
+                        Math.sin(i * Math.PI / 3) * 40
+                    );
+                    this.scene.add(stand);
+                }
+            }
+            
+            async getOrGenerateAsset(filename, prompt) {
+                if (this.assetCache[filename]) {
+                    // Load from cache
+                    const loader = new THREE.TextureLoader();
+                    return new Promise((resolve) => {
+                        loader.load(this.assetCache[filename], resolve);
+                    });
+                } else {
+                    // Generate new asset
+                    const result = await websim.imageGen({
+                        prompt: prompt,
+                        transparent: true,
+                        aspect_ratio: "1:1"
+                    });
+                    
+                    // Cache the asset
+                    this.assetCache[filename] = result.url;
+                    this.saveAssetCache();
+                    
+                    const loader = new THREE.TextureLoader();
+                    return new Promise((resolve) => {
+                        loader.load(result.url, resolve);
+                    });
+                }
+            }
+            
+            setupControls() {
+                this.controls = new PointerLockControls(this.camera, this.renderer.domElement);
+                this.camera.position.set(0, 5, 10);
+                
+                // Click to enable controls
+                this.renderer.domElement.addEventListener('click', () => {
+                    if (document.getElementById('characterSelector').style.display !== 'none') return;
+                    this.controls.lock();
+                });
+            }
+            
+            setupEventListeners() {
+                // Keyboard events
+                document.addEventListener('keydown', (event) => {
+                    this.keys[event.code] = true;
+                    
+                    if (event.code === 'Space') {
+                        event.preventDefault();
+                        this.isCharging = true;
+                    }
+                });
+                
+                document.addEventListener('keyup', (event) => {
+                    this.keys[event.code] = false;
+                    
+                    if (event.code === 'Space') {
+                        this.jump();
+                        this.isCharging = false;
+                    }
+                });
+                
+                // Window resize
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+            }
+            
+            async generateCharacter(characterName) {
+                this.showLoading(true, `Generating ${characterName}...`);
+                
+                try {
+                    const characterTexture = await this.getOrGenerateAsset(
+                        `character_${characterName.toLowerCase().replace(/\s+/g, '_')}.png`,
+                        `${characterName} character for basketball game, full body, athletic pose, transparent background`
+                    );
+                    
+                    // Remove old player
+                    if (this.player) {
+                        this.scene.remove(this.player);
+                    }
+                    
+                    // Create new player
+                    const playerGeometry = new THREE.BoxGeometry(1.5, 3, 0.5);
+                    const playerMaterial = new THREE.MeshLambertMaterial({ 
+                        map: characterTexture,
+                        transparent: true 
+                    });
+                    this.player = new THREE.Mesh(playerGeometry, playerMaterial);
+                    this.player.position.set(0, 1.5, 5);
+                    this.player.castShadow = true;
+                    this.scene.add(this.player);
+                    
+                    this.currentCharacterName = characterName;
+                    document.getElementById('currentCharacter').textContent = characterName;
+                    document.getElementById('characterSelector').style.display = 'none';
+                    
+                } catch (error) {
+                    console.error('Error generating character:', error);
+                } finally {
+                    this.showLoading(false);
+                }
+            }
+            
+            showLoading(show, text = 'Loading...') {
+                const loadingScreen = document.getElementById('loadingScreen');
+                const loadingText = document.getElementById('loadingText');
+                loadingScreen.style.display = show ? 'flex' : 'none';
+                loadingText.textContent = text;
+            }
+            
+            jump() {
+                if (this.player && this.player.position.y <= this.groundLevel + 1.6) {
+                    const power = Math.min(this.jumpPower, 100);
+                    this.playerVelocity.y = 0.3 + (power / 100) * 0.4;
+                    this.jumpPower = 0;
+                }
+            }
+            
+            update() {
+                if (!this.player) return;
+                
+                // Movement
+                const speed = 0.1;
+                const direction = new THREE.Vector3();
+                
+                if (this.keys['KeyW']) direction.z -= 1;
+                if (this.keys['KeyS']) direction.z += 1;
+                if (this.keys['KeyA']) direction.x -= 1;
+                if (this.keys['KeyD']) direction.x += 1;
+                
+                if (direction.length() > 0) {
+                    direction.normalize();
+                    this.player.position.add(direction.multiplyScalar(speed));
+                }
+                
+                // Charging jump power
+                if (this.isCharging && this.jumpPower < 100) {
+                    this.jumpPower += 2;
+                }
+                
+                // Gravity
+                this.playerVelocity.y += this.gravity;
+                this.player.position.add(this.playerVelocity);
+                
+                // Ground collision
+                if (this.player.position.y <= this.groundLevel + 1.5) {
+                    this.player.position.y = this.groundLevel + 1.5;
+                    this.playerVelocity.y = 0;
+                }
+                
+                // Update camera to follow player
+                if (this.controls.isLocked && !this.isPlayerBall) {
+                    this.camera.position.x = this.player.position.x;
+                    this.camera.position.z = this.player.position.z + 3;
+                }
+                
+                // Update UI
+                document.getElementById('power').textContent = Math.round(this.jumpPower);
+                document.getElementById('height').textContent = Math.round((this.player.position.y - 1.5) * 3.28);
+                
+                // Check for dunk
+                this.checkDunk();
+            }
+            
+            checkDunk() {
+                if (!this.player || !this.hoop) return;
+                
+                const distance = this.player.position.distanceTo(new THREE.Vector3(0, 6, -11));
+                if (distance < 3 && this.player.position.y > 5) {
+                    // Successful dunk!
+                    this.celebrateDunk();
+                }
+            }
+            
+            celebrateDunk() {
+                // Visual celebration effect
+                for (let i = 0; i < 20; i++) {
+                    const particle = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.1),
+                        new THREE.MeshBasicMaterial({ color: Math.random() * 0xffffff })
+                    );
+                    particle.position.copy(this.player.position);
+                    particle.velocity = new THREE.Vector3(
+                        (Math.random() - 0.5) * 0.3,
+                        Math.random() * 0.3,
+                        (Math.random() - 0.5) * 0.3
+                    );
+                    this.scene.add(particle);
+                    
+                    // Remove particles after a delay
+                    setTimeout(() => this.scene.remove(particle), 2000);
+                }
+            }
+            
+            transformToBall() {
+                if (!this.player) return;
+                
+                this.isPlayerBall = !this.isPlayerBall;
+                
+                if (this.isPlayerBall) {
+                    // Hide player, control ball
+                    this.player.visible = false;
+                    this.ball.position.copy(this.player.position);
+                    document.getElementById('transformButton').textContent = 'Become Character!';
+                } else {
+                    // Show player, ball independent
+                    this.player.visible = true;
+                    this.player.position.copy(this.ball.position);
+                    document.getElementById('transformButton').textContent = 'Become the Ball!';
+                }
+            }
+            
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                this.update();
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+        
+        // Global functions
+        window.generateCharacter = async function() {
+            const input = document.getElementById('characterInput').value.trim();
+            if (!input) {
+                alert('Please enter a character description!');
+                return;
+            }
+            await game.generateCharacter(input);
+        };
+        
+        window.useRandomCharacter = async function() {
+            const randomCharacters = [
+                'dragon', 'robot', 'dinosaur', 'superhero', 'wizard', 'ninja',
+                'alien', 'pirate', 'vampire', 'werewolf', 'knight', 'astronaut',
+                'elephant', 'giraffe', 'penguin', 'octopus', 'phoenix', 'unicorn'
+            ];
+            const randomChar = randomCharacters[Math.floor(Math.random() * randomCharacters.length)];
+            await game.generateCharacter(randomChar);
+        };
+        
+        window.transformToBall = function() {
+            game.transformToBall();
+        };
+        
+        // Start the game
+        const game = new DunkingSimulator();
+    </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
+
